@@ -28,3 +28,5 @@ lib/test_fixtures/build_success/build_success
 *.iml
 *.ipr
 *.iws
+
+vendor

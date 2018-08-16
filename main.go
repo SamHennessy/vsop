@@ -1,15 +1,7 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-
-	"github.com/codegangsta/envy/lib"
-	"github.com/codegangsta/gin/lib"
-	shellwords "github.com/mattn/go-shellwords"
-	"gopkg.in/urfave/cli.v1"
-
-	"github.com/0xAX/notificator"
 	"log"
 	"os"
 	"os/signal"
@@ -18,23 +10,32 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/0xAX/notificator"
+	"github.com/codegangsta/envy/lib"
+	"github.com/codegangsta/gin/lib"
+	"github.com/fsnotify/fsnotify"
+	shellwords "github.com/mattn/go-shellwords"
+	"gopkg.in/urfave/cli.v1"
 )
+
+var watcher *fsnotify.Watcher
 
 var (
 	startTime     = time.Now()
-	logger        = log.New(os.Stdout, "[gin] ", 0)
+	logger        = log.New(os.Stdout, "[vsop] ", 0)
 	immediate     = false
 	buildError    error
 	colorGreen    = string([]byte{27, 91, 57, 55, 59, 51, 50, 59, 49, 109})
 	colorRed      = string([]byte{27, 91, 57, 55, 59, 51, 49, 59, 49, 109})
 	colorReset    = string([]byte{27, 91, 48, 109})
-	notifier      = notificator.New(notificator.Options{AppName: "Gin Build"})
+	notifier      = notificator.New(notificator.Options{AppName: "VSOP Build"})
 	notifications = false
 )
 
 func main() {
 	app := cli.NewApp()
-	app.Name = "gin"
+	app.Name = "vsop"
 	app.Usage = "A live reload utility for Go web applications."
 	app.Action = MainAction
 	app.Flags = []cli.Flag{
@@ -114,7 +115,7 @@ func main() {
 			Name:   "logPrefix",
 			EnvVar: "GIN_LOG_PREFIX",
 			Usage:  "Log prefix",
-			Value:  "gin",
+			Value:  "vsop",
 		},
 		cli.BoolFlag{
 			Name:   "notifications",
@@ -143,7 +144,7 @@ func main() {
 func MainAction(c *cli.Context) {
 	laddr := c.GlobalString("laddr")
 	port := c.GlobalInt("port")
-	all := c.GlobalBool("all")
+	// all := c.GlobalBool("all")
 	appPort := strconv.Itoa(c.GlobalInt("appPort"))
 	immediate = c.GlobalBool("immediate")
 	keyFile := c.GlobalString("keyFile")
@@ -202,11 +203,53 @@ func MainAction(c *cli.Context) {
 	// build right now
 	build(builder, runner, logger)
 
-	// scan for changes
-	scanChanges(c.GlobalString("path"), c.GlobalStringSlice("excludeDir"), all, func(path string) {
-		runner.Kill()
-		build(builder, runner, logger)
-	})
+	// Watch sub folders
+
+	// creates a new file watcher
+	// TODO: check error
+	watcher, _ = fsnotify.NewWatcher()
+	defer watcher.Close()
+	//
+
+	// starting at the root of the project, walk each file/directory searching for
+	// directories
+	if err := filepath.Walk(c.GlobalString("path"), watchDir); err != nil {
+		logger.Println("ERROR", err)
+	}
+
+	done := make(chan bool)
+
+	//
+	go func() {
+		lastBuild := time.Now()
+		for {
+			select {
+			// watch for events
+			case event := <-watcher.Events:
+				if event.Op == fsnotify.Write && strings.HasSuffix(event.Name, ".go") {
+					td := time.Now().Sub(lastBuild)
+					if td.Seconds() > 1 {
+						runner.Kill()
+						// Wait for any post save hooks to run
+						time.Sleep(100 * time.Millisecond)
+						build(builder, runner, logger)
+						lastBuild = time.Now()
+					}
+				} else if event.Op == fsnotify.Create {
+					info, err := os.Stat(event.Name)
+					if err == nil && info.IsDir() {
+						watcher.Add(event.Name)
+					}
+				}
+
+				// watch for errors
+			case err := <-watcher.Errors:
+				logger.Printf("ERROR %v\n", err)
+			}
+		}
+	}()
+
+	<-done
 }
 
 func EnvAction(c *cli.Context) {
@@ -228,19 +271,20 @@ func EnvAction(c *cli.Context) {
 func build(builder gin.Builder, runner gin.Runner, logger *log.Logger) {
 	logger.Println("Building...")
 
-	if notifications {
-		notifier.Push("Build Started!", "Building "+builder.Binary()+"...", "", notificator.UR_NORMAL)
-	}
+	buildStart := time.Now()
 	err := builder.Build()
+	buildTime := time.Now().Sub(buildStart)
 	if err != nil {
 		buildError = err
 		logger.Printf("%sBuild failed%s\n", colorRed, colorReset)
 		fmt.Println(builder.Errors())
 		buildErrors := strings.Split(builder.Errors(), "\n")
 		if notifications {
-			if err := notifier.Push("Build FAILED!", buildErrors[1], "", notificator.UR_CRITICAL); err != nil {
-				logger.Println("Notification send failed")
-			}
+			go func() {
+				if err := notifier.Push("Build FAILED!", buildErrors[1], "", notificator.UR_CRITICAL); err != nil {
+					logger.Println("Notification send failed")
+				}
+			}()
 		}
 	} else {
 		buildError = nil
@@ -249,43 +293,13 @@ func build(builder gin.Builder, runner gin.Runner, logger *log.Logger) {
 			runner.Run()
 		}
 		if notifications {
-			if err := notifier.Push("Build Succeded", "Build Finished!", "", notificator.UR_CRITICAL); err != nil {
-				logger.Println("Notification send failed")
-			}
-		}
-	}
+			go func() {
 
-	time.Sleep(100 * time.Millisecond)
-}
-
-type scanCallback func(path string)
-
-func scanChanges(watchPath string, excludeDirs []string, allFiles bool, cb scanCallback) {
-	for {
-		filepath.Walk(watchPath, func(path string, info os.FileInfo, err error) error {
-			if path == ".git" && info.IsDir() {
-				return filepath.SkipDir
-			}
-			for _, x := range excludeDirs {
-				if x == path {
-					return filepath.SkipDir
+				if err := notifier.Push("Built", "Time: "+buildTime.String(), "", notificator.UR_NORMAL); err != nil {
+					logger.Println("Notification send failed")
 				}
-			}
-
-			// ignore hidden files
-			if filepath.Base(path)[0] == '.' {
-				return nil
-			}
-
-			if (allFiles || filepath.Ext(path) == ".go") && info.ModTime().After(startTime) {
-				cb(path)
-				startTime = time.Now()
-				return errors.New("done")
-			}
-
-			return nil
-		})
-		time.Sleep(500 * time.Millisecond)
+			}()
+		}
 	}
 }
 
@@ -301,4 +315,16 @@ func shutdown(runner gin.Runner) {
 		}
 		os.Exit(1)
 	}()
+}
+
+// watchDir gets run as a walk func, searching for directories to add watchers to
+func watchDir(path string, fi os.FileInfo, err error) error {
+
+	// since fsnotify can watch all the files in a directory, watchers only need
+	// to be added to each nested directory
+	if fi.Mode().IsDir() {
+		return watcher.Add(path)
+	}
+
+	return nil
 }
