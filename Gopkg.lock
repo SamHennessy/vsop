@@ -10,22 +10,6 @@
   revision = "88d57ee9043ba88d6a62e437fa15dda1ca0d2b59"
 
 [[projects]]
-  branch = "master"
-  digest = "1:0e26aa1507d19d7ad0ab22435f4af6a286e069f7a9d308f2d7fa698e0c82acbd"
-  name = "github.com/codegangsta/envy"
-  packages = ["lib"]
-  pruneopts = "UT"
-  revision = "4b78388c8ce4fa412440ca4eaa654e2fdd752e49"
-
-[[projects]]
-  branch = "master"
-  digest = "1:6b3e0f3315bbac85c76f75e696d4f15f20ecefc0279ccb6bf23eeb2ccb7eac15"
-  name = "github.com/codegangsta/gin"
-  packages = ["lib"]
-  pruneopts = "UT"
-  revision = "cafe2ce98974a3dcca6b92ce393a91a0b58b8133"
-
-[[projects]]
   digest = "1:abeb38ade3f32a92943e5be54f55ed6d6e3b6602761d74b4aab4c9dd45c18abd"
   name = "github.com/fsnotify/fsnotify"
   packages = ["."]
@@ -34,12 +18,55 @@
   version = "v1.4.7"
 
 [[projects]]
+  digest = "1:9685bd41ea07a8b31aaab2c11f31a972e31f975dd155d3365a580a9e7eb5c90b"
+  name = "github.com/joho/godotenv"
+  packages = [
+    ".",
+    "autoload",
+  ]
+  pruneopts = "UT"
+  revision = "a79fa1e548e2c689c241d10173efd51e5d689d5b"
+  version = "v1.2.0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:114ecad51af93a73ae6781fd0d0bc28e52b433c852b84ab4b4c109c15e6c6b6d"
+  name = "github.com/jroimartin/gocui"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "c055c87ae801372cd74a0839b972db4f7697ae5f"
+
+[[projects]]
+  digest = "1:cdb899c199f907ac9fb50495ec71212c95cb5b0e0a8ee0800da0238036091033"
+  name = "github.com/mattn/go-runewidth"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "ce7b0b5c7b45a81508558cd1dba6bb1e4ddb51bb"
+  version = "v0.0.3"
+
+[[projects]]
   digest = "1:7efe48dea4db6b35dcc15e15394b627247e5b3fb814242de986b746ba8e0abf0"
   name = "github.com/mattn/go-shellwords"
   packages = ["."]
   pruneopts = "UT"
   revision = "02e3cf038dcea8290e44424da473dd12be796a8a"
   version = "v1.0.3"
+
+[[projects]]
+  branch = "master"
+  digest = "1:c9b6e36dbd23f8403a04493376916ca5dad8c01b2da5ae0a05e6a468eb0b6f24"
+  name = "github.com/nsf/termbox-go"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "5c94acc5e6eb520f1bcd183974e01171cc4c23b3"
+
+[[projects]]
+  digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
+  version = "v0.8.0"
 
 [[projects]]
   branch = "master"
@@ -62,10 +89,11 @@
   analyzer-version = 1
   input-imports = [
     "github.com/0xAX/notificator",
-    "github.com/codegangsta/envy/lib",
-    "github.com/codegangsta/gin/lib",
     "github.com/fsnotify/fsnotify",
+    "github.com/joho/godotenv/autoload",
+    "github.com/jroimartin/gocui",
     "github.com/mattn/go-shellwords",
+    "github.com/pkg/errors",
     "gopkg.in/urfave/cli.v1",
   ]
   solver-name = "gps-cdcl"

@@ -1,4 +1,4 @@
-package gin
+package vsop
 
 import (
 	"encoding/json"

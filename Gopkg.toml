@@ -24,27 +24,6 @@
 #   go-tests = true
 #   unused-packages = true
 
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/0xAX/notificator"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/codegangsta/envy"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/codegangsta/gin"
-
-[[constraint]]
-  name = "github.com/mattn/go-shellwords"
-  version = "1.0.3"
-
-[[constraint]]
-  name = "gopkg.in/urfave/cli.v1"
-  version = "1.20.0"
-
 [prune]
   go-tests = true
   unused-packages = true

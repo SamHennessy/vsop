@@ -1,4 +1,4 @@
-package gin
+package vsop
 
 import (
 	"fmt"
@@ -6,15 +6,11 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
-type Builder interface {
-	Build() error
-	Binary() string
-	Errors() string
-}
-
-type builder struct {
+type Builder struct {
 	dir       string
 	binary    string
 	errors    string
@@ -23,7 +19,7 @@ type builder struct {
 	buildArgs []string
 }
 
-func NewBuilder(dir string, bin string, useGodep bool, wd string, buildArgs []string) Builder {
+func NewBuilder(dir string, bin string, useGodep bool, wd string, buildArgs []string) *Builder {
 	if len(bin) == 0 {
 		bin = "bin"
 	}
@@ -35,18 +31,18 @@ func NewBuilder(dir string, bin string, useGodep bool, wd string, buildArgs []st
 		}
 	}
 
-	return &builder{dir: dir, binary: bin, useGodep: useGodep, wd: wd, buildArgs: buildArgs}
+	return &Builder{dir: dir, binary: bin, useGodep: useGodep, wd: wd, buildArgs: buildArgs}
 }
 
-func (b *builder) Binary() string {
+func (b *Builder) Binary() string {
 	return b.binary
 }
 
-func (b *builder) Errors() string {
+func (b *Builder) Errors() string {
 	return b.errors
 }
 
-func (b *builder) Build() error {
+func (b *Builder) Build() error {
 	args := append([]string{"go", "build", "-o", filepath.Join(b.wd, b.binary)}, b.buildArgs...)
 
 	var command *exec.Cmd
@@ -69,5 +65,26 @@ func (b *builder) Build() error {
 		return fmt.Errorf(b.errors)
 	}
 
+	return err
+}
+
+// DepEnsure runs dep ensure in the working directory
+func (b *Builder) DepEnsure() error {
+	var command *exec.Cmd
+	command = exec.Command("dep", "ensure")
+	output, err := command.CombinedOutput()
+	if err != nil {
+		return errors.Wrap(err, "builder dep ensure")
+	}
+
+	if command.ProcessState.Success() {
+		b.errors = ""
+	} else {
+		b.errors = string(output)
+	}
+
+	if len(b.errors) > 0 {
+		return fmt.Errorf(b.errors)
+	}
 	return err
 }
