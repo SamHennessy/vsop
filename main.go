@@ -419,7 +419,7 @@ func guidash() {
 	go watchLogs()
 	// Status
 	go func() {
-		ticker := time.NewTicker(time.Millisecond * 100)
+		ticker := time.NewTicker(time.Millisecond * 500)
 		for range ticker.C {
 			updateStatus()
 		}
@@ -481,11 +481,19 @@ func initGlobalKeybindings(g *gocui.Gui) error {
 }
 
 func quit(g *gocui.Gui, v *gocui.View) error {
+	killNow()
 	done <- true
 	return gocui.ErrQuit
 }
 
 func scrollView(v *gocui.View, dy int) error {
+	if v.Autoscroll {
+		v.Autoscroll = false
+		renderLogs()
+		// TODO: ?
+		time.Sleep(time.Millisecond * 500)
+	}
+
 	ox, oy := v.Origin()
 	_, maxY := v.Size()
 	viewLines := v.ViewBufferLines()
@@ -496,7 +504,6 @@ func scrollView(v *gocui.View, dy int) error {
 		return nil
 	}
 
-	v.Autoscroll = false
 	if err := v.SetOrigin(ox, oy+dy); err != nil {
 		return err
 	}
@@ -518,11 +525,21 @@ func watchLogs() {
 				renderLogs()
 			}
 		}
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 500)
 	}
 }
 
+// TODO: is this helping?
+var rendering = false
+
 func renderLogs() {
+	// TODO: ?
+	if rendering == true {
+		//logV.Debug("Render flood")
+		return
+	}
+	rendering = true
+
 	logs := vsop.LL().Logs
 	g.Update(func(g *gocui.Gui) error {
 		v, err := g.View("logs")
@@ -538,6 +555,11 @@ func renderLogs() {
 		} else {
 			v.Title = " Logs [All] App  VSOP  "
 		}
+
+		// TODO:
+		// if v.Autoscroll && len(logs) > 500 {
+		// 	logs = logs[len(logs)-500:]
+		// }
 
 		for i := 0; i < len(logs); i++ {
 
@@ -594,6 +616,8 @@ func renderLogs() {
 				lMsg,
 			)
 		}
+		// TODO: ?
+		rendering = false
 		return nil
 	})
 }
@@ -671,6 +695,8 @@ func logEditor(v *gocui.View, key gocui.Key, ch rune, mod gocui.Modifier) {
 	switch {
 	case key == gocui.KeyEnter:
 		logS.Info("")
+		autoscroll(v)
+		renderLogs()
 	case key == gocui.KeyArrowDown:
 		scrollView(v, 1)
 	case key == gocui.KeyArrowUp:
